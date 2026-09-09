@@ -1,0 +1,186 @@
+[
+  {
+    "id": "situational",
+    "name": "Situational Awareness",
+    "cik": "2045724",
+    "style": "테크 · AI 집중투자",
+    "hedgefollow": "Situational+Awareness",
+    "popular": true
+  },
+  {
+    "id": "berkshire",
+    "name": "Berkshire Hathaway",
+    "cik": "1067983",
+    "style": "집중 가치투자",
+    "hedgefollow": "Berkshire+Hathaway",
+    "popular": true
+  },
+  {
+    "id": "duquesne",
+    "name": "Duquesne Family Office",
+    "cik": "1536411",
+    "style": "매크로 · 성장투자",
+    "hedgefollow": "Duquesne+Family+Office",
+    "popular": true
+  },
+  {
+    "id": "pershing",
+    "name": "Pershing Square Inc.",
+    "cik": "2026053",
+    "style": "액티비스트 · 연결 공시 법인",
+    "hedgefollow": "Pershing+Square+Capital+Management",
+    "popular": true
+  },
+  {
+    "id": "bridgewater",
+    "name": "Bridgewater Associates",
+    "cik": "1350694",
+    "style": "글로벌 매크로",
+    "hedgefollow": "Bridgewater+Associates",
+    "popular": true
+  },
+  {
+    "id": "renaissance",
+    "name": "Renaissance Technologies",
+    "cik": "1037389",
+    "style": "퀀트 · 시스템",
+    "hedgefollow": "Renaissance+Technologies",
+    "popular": true
+  },
+  {
+    "id": "blackrock",
+    "name": "BlackRock",
+    "cik": "2012383",
+    "style": "대형 자산운용사",
+    "hedgefollow": "BlackRock",
+    "popular": true
+  },
+  {
+    "id": "altimeter",
+    "name": "Altimeter Capital Management",
+    "cik": "1541617",
+    "style": "테크 · 성장투자",
+    "hedgefollow": "Altimeter+Capital+Management",
+    "popular": true
+  },
+  {
+    "id": "tci",
+    "name": "TCI Fund Management",
+    "cik": "1647251",
+    "style": "집중 장기투자",
+    "hedgefollow": "TCI+Fund+Management",
+    "popular": true
+  },
+  {
+    "id": "appaloosa",
+    "name": "Appaloosa Management",
+    "cik": "1656456",
+    "style": "기회주의 · 가치투자",
+    "hedgefollow": "Appaloosa+Management",
+    "popular": true
+  },
+  {
+    "id": "tudor",
+    "name": "Tudor Investment",
+    "cik": "923093",
+    "style": "매크로 · 멀티전략",
+    "hedgefollow": "Tudor+Investment",
+    "popular": true
+  },
+  {
+    "id": "citadel",
+    "name": "Citadel Advisors",
+    "cik": "1423053",
+    "style": "멀티전략 · 마켓메이킹",
+    "hedgefollow": "Citadel+Advisors",
+    "popular": true
+  },
+  {
+    "id": "himalaya",
+    "name": "Himalaya Capital Management",
+    "cik": "1709323",
+    "style": "집중 가치투자",
+    "hedgefollow": "Himalaya+Capital+Management",
+    "popular": true
+  },
+  {
+    "id": "ark",
+    "name": "ARK Investment Management",
+    "cik": "1697748",
+    "style": "혁신 · 테마 투자",
+    "hedgefollow": "ARK+Investment+Management",
+    "popular": true
+  },
+  {
+    "id": "janestreet",
+    "name": "Jane Street Group",
+    "cik": "1595888",
+    "style": "퀀트 · 마켓메이킹",
+    "hedgefollow": "Jane+Street+Group",
+    "popular": true
+  },
+  {
+    "id": "nvidia",
+    "name": "Nvidia Corp",
+    "cik": "1045810",
+    "style": "기업 투자 포트폴리오",
+    "hedgefollow": "Nvidia+Corp",
+    "popular": true
+  },
+  {
+    "id": "oaktree",
+    "name": "Oaktree Capital Management",
+    "cik": "949509",
+    "style": "크레딧 · 가치투자",
+    "hedgefollow": "Oaktree+Capital+Management",
+    "popular": true
+  },
+  {
+    "id": "point72",
+    "name": "Point72 Asset Management",
+    "cik": "1603466",
+    "style": "멀티전략",
+    "hedgefollow": "Point72+Asset+Management",
+    "popular": true
+  },
+  {
+    "id": "coatue",
+    "name": "Coatue Management",
+    "cik": "1135730",
+    "style": "테크 · 성장투자",
+    "hedgefollow": "Coatue+Management",
+    "popular": true
+  },
+  {
+    "id": "dalal",
+    "name": "Dalal Street",
+    "cik": "1549575",
+    "style": "집중 가치투자",
+    "hedgefollow": "Dalal+Street",
+    "popular": true
+  },
+  {
+    "id": "thirdpoint",
+    "name": "Third Point",
+    "cik": "1040273",
+    "style": "이벤트 드리븐",
+    "hedgefollow": "Third+Point",
+    "popular": false
+  },
+  {
+    "id": "viking",
+    "name": "Viking Global Investors",
+    "cik": "1103804",
+    "style": "펀더멘털 롱/숏",
+    "hedgefollow": "Viking+Global+Investors",
+    "popular": false
+  },
+  {
+    "id": "lonepine",
+    "name": "Lone Pine Capital",
+    "cik": "1061165",
+    "style": "성장주 중심",
+    "hedgefollow": "Lone+Pine+Capital",
+    "popular": false
+  }
+]

@@ -1,0 +1,3 @@
+# Optional: install into an isolated Python 3.12+ virtual environment.
+# Public API inspected on 2026-09-09; pin avoids silent upstream changes.
+tradingagents @ git+https://github.com/TauricResearch/TradingAgents.git@be952b8eccb49720509af544c6675233bc1f10d0
