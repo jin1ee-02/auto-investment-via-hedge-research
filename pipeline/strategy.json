@@ -1,0 +1,7 @@
+{
+  "fundIds": ["berkshire", "pershing", "bridgewater", "appaloosa", "thirdpoint", "viking", "lonepine", "coatue"],
+  "budgetUsd": 10000,
+  "maxWeight": 0.2,
+  "minCash": 0.1,
+  "maxHoldings": 8
+}
