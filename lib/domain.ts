@@ -1,6 +1,6 @@
 export type Position={key:string;cusip:string;name:string;class:string;kind:string;value:number;shares:number;ticker:string|null;issuerCik?:string};
 export type Snapshot={period:string;filedAt:string;accession:string;sourceUrl:string;totalValue:number;positions:Position[];complete:boolean};
-export type Fund={id:string;name:string;cik:string;secName?:string;popular?:boolean;style:string;hedgefollow:string;status:string;error?:string;snapshots:Snapshot[]};
+export type Fund={id:string;name:string;cik:string;secName?:string;popular?:boolean;style:string;hedgefollow:string;representative?:string;representativeRole?:string;status:string;error?:string;snapshots:Snapshot[]};
 export type Dataset={schemaVersion:number;generatedAt:string;period:string;previousPeriod:string;source:string;universeStatus:string;funds:Fund[]};
 export type Movement='new'|'increased'|'decreased'|'closed'|'unchanged';
 export type Contribution={fundId:string;fundName:string;value:number;weight:number;previousWeight:number;shares:number;previousShares:number;deltaShares:number;movement:Movement;estimatedChange:number;sourceUrl:string;previousSourceUrl:string};

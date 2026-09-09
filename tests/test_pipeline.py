@@ -18,6 +18,11 @@ class Tests(unittest.TestCase):
         with self.assertRaises(ValueError):parse_table(b'<html>Blocked</html>','2026-01-01')
     def test_warrants_not_mapped_to_common(self):
         r={'name':'APPLE INC','class':'W EXP 2028','ticker':None};resolve_ticker(r,{'APPLE':[{'ticker':'AAPL','cik_str':320193}]});self.assertIsNone(r['ticker'])
+    def test_curated_cusip_and_abbreviated_name_resolve(self):
+        curated={'cusip':'060505104','name':'BANK OF AMER CORP','class':'COM','ticker':None};resolve_ticker(curated,{})
+        self.assertEqual(curated['ticker'],'BAC')
+        abbreviated={'cusip':'test','name':'APPLIED MATLS INC','class':'COM','ticker':None};resolve_ticker(abbreviated,{'APPLIEDMATERIALS':[{'ticker':'AMAT','cik_str':6951}]})
+        self.assertEqual(abbreviated['ticker'],'AMAT')
     def test_no_toss_network_path(self):
         with self.assertRaises(RuntimeError):TossBrokerDisabled().submit_orders([{'ticker':'AAPL'}])
         self.assertFalse(PaperBroker().submit_orders([])['executed'])

@@ -8,6 +8,19 @@ import xml.etree.ElementTree as ET
 ROOT = Path(__file__).resolve().parents[1]
 CACHE = ROOT / 'work' / 'sec-cache'
 NS = {'f': 'http://www.sec.gov/edgar/document/thirteenf/informationtable'}
+SECURITY_METADATA = json.loads((ROOT/'data/security-metadata.json').read_text(encoding='utf-8'))
+CUSIP_TICKERS = SECURITY_METADATA['tickers']
+ABBREVIATIONS = {
+    'AMER':'AMERICA','AMERN':'AMERICAN','ASSOC':'ASSOCIATES','BANC':'BANK','BK':'BANK',
+    'CMNTYS':'COMMUNITIES','CTZNS':'CITIZENS','ELEC':'ELECTRIC','ENTMT':'ENTERTAINMENT',
+    'FINL':'FINANCIAL','HLDG':'HOLDINGS','HLDGS':'HOLDINGS','INDS':'INDUSTRIES',
+    'INTL':'INTERNATIONAL','INVT':'INVESTMENT','INVTS':'INVESTMENTS','MATLS':'MATERIALS',
+    'MFR':'MANUFACTURING','MNG':'MINING','MKT':'MARKET','MKTS':'MARKETS','MTRS':'MOTORS',
+    'NATL':'NATIONAL','PAC':'PACIFIC','PETE':'PETROLEUM','PPTY':'PROPERTY',
+    'PPTYS':'PROPERTIES','RES':'RESOURCES','RLTY':'REALTY','SVCS':'SERVICES',
+    'SYS':'SYSTEMS','TECH':'TECHNOLOGY','TELECOM':'TELECOMMUNICATIONS'
+}
+NAME_STOP_WORDS = {'INC','INCORPORATED','CORP','CORPORATION','CO','COMPANY','COS','LTD','LIMITED','PLC','LLC','LP','THE','OF','NEW','DEL','DE','NV','SA','AG','SWITZ','GROUP','IN','I'}
 
 def request(url, user_agent):
     CACHE.mkdir(parents=True, exist_ok=True)
@@ -52,27 +65,43 @@ def parse_table(raw, filing_date):
     return list(result.values())
 
 def normalize(name):
-    name=name.upper().replace('&','AND')
-    name=re.sub(r'\b(INCORPORATED|CORPORATION|COMPANY|HOLDINGS|HLDGS|INC|CORP|CO|LTD|PLC|NEW|DEL|COM)\b','',name)
-    return re.sub(r'[^A-Z0-9]','',name)
+    tokens=re.sub(r'[^A-Z0-9]+',' ',name.upper().replace('&',' AND ')).split()
+    return ''.join(ABBREVIATIONS.get(token,token) for token in tokens if token not in NAME_STOP_WORDS)
 
-def ticker_map(ua):
-    raw=jget('https://www.sec.gov/files/company_tickers.json',ua)
+def ticker_map_from_rows(raw):
     result={}
     for row in raw.values(): result.setdefault(normalize(row['title']),[]).append(row)
     return result
 
+def ticker_map(ua):
+    return ticker_map_from_rows(jget('https://www.sec.gov/files/company_tickers.json',ua))
+
+def select_common_ticker(entries):
+    candidates=sorted({entry['ticker'] for entry in entries if re.fullmatch(r'[A-Z]{1,5}',entry['ticker'])},key=lambda ticker:(len(ticker),ticker))
+    return candidates[0] if candidates and (len(candidates)==1 or len(candidates[0])<len(candidates[1])) else None
+
 def resolve_ticker(row, tickers):
-    # Exact normalized issuer only; ambiguous multi-class issues remain CUSIP-only.
-    if not re.search(r'\b(COM|ORD|CL [ABC]|CAP STK|SHS|ADS|ADR)\b',row['class'].upper()) or re.search(r'\b(PFD|PREF|NOTE|WARRANT|W EXP|RIGHT)\b',row['class'].upper()):
+    curated=CUSIP_TICKERS.get(row.get('cusip',''))
+    if curated:
+        row['ticker']=curated
         return
-    entries=tickers.get(normalize(row['name']),[])
-    if len(entries)==1:
-        row['ticker']=entries[0]['ticker']; row['issuerCik']=str(entries[0]['cik_str'])
-    elif normalize(row['name'])=='ALPHABET':
+    # Reject preferreds, notes, warrants and rights before matching common equity.
+    if not re.search(r'\b(COM|COMMON|ORD|ORDINARY|NAMEN|CL [ABC]|CAP STK|SHS|SH BEN INT|ADS|ADR)\b',row['class'].upper()) or re.search(r'\b(PFD|PREF|NOTE|WARRANT|W EXP|RIGHT)\b',row['class'].upper()):
+        return
+    normalized=normalize(row['name']);entries=tickers.get(normalized,[])
+    if not entries and len(normalized)>=8:
+        matches=[value for key,value in tickers.items() if min(len(key),len(normalized))>=8 and min(len(key),len(normalized))/max(len(key),len(normalized))>=.72 and (key.startswith(normalized) or normalized.startswith(key))]
+        if len(matches)==1: entries=matches[0]
+    if normalized=='ALPHABET':
         wanted='GOOGL' if 'CL A' in row['class'] or 'CAP STK CL A' in row['class'] else 'GOOG' if 'CL C' in row['class'] else None
         match=next((r for r in entries if r['ticker']==wanted),None)
         if match: row['ticker']=match['ticker']; row['issuerCik']=str(match['cik_str'])
+        return
+    ticker=entries[0]['ticker'] if len(entries)==1 else select_common_ticker(entries)
+    if ticker:
+        row['ticker']=ticker
+        match=next(entry for entry in entries if entry['ticker']==ticker)
+        row['issuerCik']=str(match['cik_str'])
 
 def get_filing(fund, record, ua, tickers):
     acc=record['accessionNumber']; date=record['filingDate']; report=record['reportDate']
