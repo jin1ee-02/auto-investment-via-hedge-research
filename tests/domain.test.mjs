@@ -1,9 +1,26 @@
 import test from 'node:test';import assert from 'node:assert/strict';import {readFileSync} from 'node:fs';
-import {changes,aggregate,allocate} from '../lib/domain.ts';
+import {changes,aggregate,allocate,sortConsensus} from '../lib/domain.ts';
 const position=(key,value,shares,kind='EQUITY',ticker=key)=>({key,cusip:key,name:key,class:'COM',kind,value,shares,ticker});
 const snapshot=(period,positions)=>({period,positions,complete:true,totalValue:positions.reduce((s,p)=>s+p.value,0),sourceUrl:'https://www.sec.gov/test',filedAt:'2026-08-14',accession:'test'});
 const fund=(id,old,current)=>({id,name:id,status:'ready',snapshots:[snapshot('2026-03-31',old),snapshot('2026-06-30',current)]});
 const dataset=funds=>({period:'2026-06-30',previousPeriod:'2026-03-31',funds});
+test('Ownership breadth uses a fixed fund panel and only entries/exits change it',()=>{
+ const d=dataset([fund('a',[position('X',100,10)],[position('X',200,20)]),fund('b',[position('X',100,10)],[]),fund('c',[],[position('Y',100,10)])]);
+ const rows=aggregate(d,['a','b','c']);const x=rows.find(r=>r.key==='X'),y=rows.find(r=>r.key==='Y');
+ assert.equal(x.breadth,1/3);assert.equal(x.breadthChange,-1/3);assert.equal(y.breadthChange,1/3);
+ assert.ok(Math.abs(x.score-100/3)<1e-10);assert.equal(aggregate(d,['a','b','c'],'value').find(r=>r.key==='X').score,x.score);
+ assert.equal(aggregate(d,['a'])[0].breadthChange,0);
+ const closed=aggregate(d,['b'])[0];assert.equal(closed.breadth,0);assert.equal(closed.breadthChange,-1);
+});
+test('Consensus sorts both ways, retains exits and does not mutate input',()=>{
+ const rows=aggregate(dataset([fund('a',[position('EXIT',100,10)],[position('A',200,20),position('B',100,10)]),fund('b',[position('EXIT',100,10),position('A',100,10)],[position('A',200,20)])]),['a','b']);
+ const order=rows.map(r=>r.key);
+ assert.equal(sortConsensus(rows,'sellers')[0].key,'EXIT');
+ assert.equal(sortConsensus(rows,'buyers')[0].key,'A');
+ assert.equal(sortConsensus(rows,'weight','asc')[0].key,'EXIT');
+ assert.equal(sortConsensus(rows,'weight')[0].key,'A');
+ assert.deepEqual(rows.map(r=>r.key),order);
+});
 test('Share deltas classify exits and additions, not mark-to-market gains',()=>{
  const d=changes(snapshot('2026-06-30',[position('A',200,10),position('C',30,3)]),snapshot('2026-03-31',[position('A',100,10),position('B',40,4)]));
  assert.equal(d.find(r=>r.key==='A').movement,'unchanged');assert.equal(d.find(r=>r.key==='B').movement,'closed');assert.equal(d.find(r=>r.key==='B').estimatedChange,-40);assert.equal(d.find(r=>r.key==='C').movement,'new');

@@ -23,10 +23,14 @@ def save_job(job_id,result):
 
 def worker(job_id,key,ids):
     save_job(job_id,{'status':'running'})
-    try: save_job(job_id,run_research(key,ids))
+    last={}
+    def update(progress):
+        last['progress']=progress
+        save_job(job_id,{'status':'running',**last})
+    try: save_job(job_id,{**run_research(key,ids,on_progress=update),**last})
     except Exception as exc:
         # Do not serialize provider HTTP errors, which can contain credentials or request data.
-        save_job(job_id,{'status':'failed','error':f'AI research failed ({type(exc).__name__}); check provider settings and server diagnostics.'})
+        save_job(job_id,{'status':'failed',**last,'error':f'AI research failed ({type(exc).__name__}); check provider settings and server diagnostics.'})
 
 def enqueue(key,ids):
     provider_config() # Reject missing API setup before creating a misleading job.

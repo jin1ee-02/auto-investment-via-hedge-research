@@ -4,7 +4,7 @@ export type Fund={id:string;name:string;cik:string;secName?:string;popular?:bool
 export type Dataset={schemaVersion:number;generatedAt:string;period:string;previousPeriod:string;source:string;universeStatus:string;funds:Fund[]};
 export type Movement='new'|'increased'|'decreased'|'closed'|'unchanged';
 export type Contribution={fundId:string;fundName:string;value:number;weight:number;previousWeight:number;shares:number;previousShares:number;deltaShares:number;movement:Movement;estimatedChange:number;sourceUrl:string;previousSourceUrl:string};
-export type Aggregate=Position & {funds:Contribution[];weight:number;holders:number;buyers:number;sellers:number;addedValue:number;reducedValue:number;score:number};
+export type Aggregate=Position & {funds:Contribution[];weight:number;holders:number;buyers:number;sellers:number;addedValue:number;reducedValue:number;score:number;breadth:number;breadthChange:number};
 export function changes(current:Snapshot,previous:Snapshot):Array<Position & {previousShares:number;deltaShares:number;previousWeight:number;weight:number;movement:Movement;estimatedChange:number}>{
  if(!current.complete||!previous.complete)throw Error('Incomplete snapshots cannot be compared');
  const now=new Map(current.positions.map(p=>[p.key,p])),old=new Map(previous.positions.map(p=>[p.key,p]));
@@ -20,16 +20,43 @@ export function aggregate(dataset:Dataset,ids:string[],mode:'equal'|'value'='equ
  const instrumentTotal=now.positions.filter(p=>p.kind===kind).reduce((s,p)=>s+p.value,0);const priorInstrumentTotal=old.positions.filter(p=>p.kind===kind).reduce((s,p)=>s+p.value,0);const previousPositions=new Map(old.positions.map(p=>[p.key,p]));total+=instrumentTotal;
  for(const change of changes(now,old).filter(p=>p.kind===kind)){
  const weight=instrumentTotal?change.value/instrumentTotal:0;
- if(!rows.has(change.key))rows.set(change.key,{...change,value:0,shares:0,funds:[],weight:0,holders:0,buyers:0,sellers:0,addedValue:0,reducedValue:0,score:0});
+ if(!rows.has(change.key))rows.set(change.key,{...change,value:0,shares:0,funds:[],weight:0,holders:0,buyers:0,sellers:0,addedValue:0,reducedValue:0,score:0,breadth:0,breadthChange:0});
  const row=rows.get(change.key)!;row.value+=change.value;row.shares+=change.shares;row.weight+=weight/funds.length;
  if(change.shares>0)row.holders++;if(change.deltaShares>0)row.buyers++;if(change.deltaShares<0)row.sellers++;
  row.addedValue+=Math.max(0,change.estimatedChange);row.reducedValue+=Math.max(0,-change.estimatedChange);
  row.funds.push({fundId:fund.id,fundName:fund.name,value:change.value,weight,previousWeight:priorInstrumentTotal?(previousPositions.get(change.key)?.value||0)/priorInstrumentTotal:0,shares:change.shares,previousShares:change.previousShares,deltaShares:change.deltaShares,movement:change.movement,estimatedChange:change.estimatedChange,sourceUrl:now.sourceUrl,previousSourceUrl:old.sourceUrl});
  }}
- for(const row of rows.values()){if(mode==='value')row.weight=total?row.value/total:0;row.score=funds.length?Math.round(60*row.holders/funds.length+25*Math.max(0,row.buyers-row.sellers)/funds.length+15*Math.min(row.weight/.1,1)):0;}
+ for(const row of rows.values()){
+  if(mode==='value')row.weight=total?row.value/total:0;
+  // CHS ownership breadth, on the same complete selected-fund panel in both quarters.
+  const previousHolders=row.funds.filter(f=>f.previousShares>0).length;
+  row.breadth=funds.length?row.holders/funds.length:0;
+  row.breadthChange=funds.length?(row.holders-previousHolders)/funds.length:0;
+  row.score=100*row.breadth; // Compatibility field for the paper allocator; not an alpha score.
+ }
  return [...rows.values()].sort((a,b)=>b.weight-a.weight||a.key.localeCompare(b.key));
 }
 export type Allocation={ticker:string;weight:number;amount:number;score:number};
+export type ConsensusSort='weight'|'buyers'|'sellers';
+export function sortConsensus(rows:Aggregate[],field:ConsensusSort,direction:'asc'|'desc'='desc'):Aggregate[]{
+ return [...rows].sort((a,b)=>(direction==='asc'?1:-1)*(a[field]-b[field])||b.weight-a.weight||a.key.localeCompare(b.key));
+}
+export function activityConsensus(row:Aggregate){
+ const participants=row.buyers+row.sellers;
+ return {direction:row.buyers===row.sellers?'mixed':row.buyers>row.sellers?'buy':'sell',common:Math.max(row.buyers,row.sellers),agreement:participants?Math.max(row.buyers,row.sellers)/participants:0};
+}
+export function buyResearchCandidates(rows:Aggregate[],count=20){
+ return researchCandidates(rows,count).filter(r=>r.buyers>=2&&r.buyers>r.sellers&&r.holders>0).map(r=>({...r,score:r.buyers}));
+}
+// Shared activity screen. Fully exited stocks remain eligible for risk research.
+export function researchCandidates(rows:Aggregate[],count?:number):Aggregate[]{
+ if(count!==undefined&&(!Number.isInteger(count)||count<1||count>20))throw Error('Research count must be 1..20');
+ const unique=new Map<string,Aggregate>();
+ for(const row of [...rows].filter(r=>r.kind==='EQUITY'&&r.ticker&&Math.max(r.buyers,r.sellers)>=2).sort((a,b)=>activityConsensus(b).common-activityConsensus(a).common||activityConsensus(b).agreement-activityConsensus(a).agreement||a.key.localeCompare(b.key))){
+  if(!unique.has(row.ticker!))unique.set(row.ticker!,row);
+ }
+ return count===undefined?[...unique.values()]:[...unique.values()].slice(0,count);
+}
 export function allocate(rows:Aggregate[],budget:number,maxWeight:number,cashReserve:number,count:number):{positions:Allocation[];cash:number;cashWeight:number}{
  if(!Number.isFinite(budget)||budget<=0||!Number.isFinite(maxWeight)||maxWeight<=0||maxWeight>1||!Number.isFinite(cashReserve)||cashReserve<0||cashReserve>=1||!Number.isInteger(count)||count<1||count>50)throw Error('잘못된 포트폴리오 설정입니다.');
  const unique=new Map<string,Aggregate>();for(const row of [...rows].sort((a,b)=>b.score-a.score))if(row.kind==='EQUITY'&&row.ticker&&row.holders>0&&row.score>0&&!unique.has(row.ticker))unique.set(row.ticker,row);

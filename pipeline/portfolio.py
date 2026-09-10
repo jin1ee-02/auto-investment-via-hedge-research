@@ -4,7 +4,7 @@ from pathlib import Path
 from .research import ROOT,domain,fingerprint,run_research
 
 def select_candidates(fund_ids,count):
-    context=domain({'action':'candidates','fundIds':fund_ids})
+    context=domain({'action':'candidates','fundIds':fund_ids,'count':count})
     return context,context['rows'][:count]
 
 def build_plan(fund_ids,budget=10000,cap=.2,cash=.1,count=8,run_missing=False):
@@ -20,7 +20,8 @@ def build_plan(fund_ids,budget=10000,cap=.2,cash=.1,count=8,run_missing=False):
         if report.get('status')!='completed' or report.get('period')!=context['period'] or sorted(report.get('fundIds',[]))!=sorted(fund_ids): raise ValueError('Stale or mismatched research context')
         reports.append(report)
     if missing: raise ValueError('AI research required first: '+', '.join(missing))
-    scores={r['ticker']:r['decision']['score'] for r in reports if r['decision']['stance']=='buy' and r['decision']['confidence']>=.65 and r['decision']['score']>=60 and not r['decision']['dataGaps']}
+    buy_candidates={r['ticker'] for r in candidates if r['buyers']>=2 and r['buyers']>r['sellers']}
+    scores={r['ticker']:r['decision']['score'] for r in reports if r['ticker'] in buy_candidates and r['decision']['stance']=='buy' and r['decision']['confidence']>=.65 and r['decision']['score']>=60 and not r['decision']['dataGaps']}
     allocation=domain({'action':'allocate','fundIds':fund_ids,'scores':scores,'budget':budget,'cap':cap,'cash':cash,'count':count})
     identity={'period':context['period'],'fundIds':sorted(fund_ids),'budget':budget,'cap':cap,'cash':cash,'count':count,'researchHashes':[fingerprint(r['key'],fund_ids) for r in reports]}
     plan_id=hashlib.sha256(json.dumps(identity,sort_keys=True).encode()).hexdigest()
@@ -39,7 +40,7 @@ def quarterly_once(config,collect_first=True):
     selected=config['fundIds'];ready={f['id'] for f in dataset['funds'] if f['status']=='ready'}
     if not set(selected).issubset(ready): raise ValueError('Configured fund has incomplete or suspect filings; keep previous plan')
     stable_data={k:v for k,v in dataset.items() if k!='generatedAt'}
-    identity={'period':dataset['period'],'config':config,'dataHash':hashlib.sha256(json.dumps(stable_data,sort_keys=True).encode()).hexdigest(),'models':{k:os.getenv(k,'') for k in ('RESEARCH_PROVIDER','RESEARCH_DEEP_MODEL','RESEARCH_QUICK_MODEL')}}
+    identity={'methodology':'quarterly-activity-v1','period':dataset['period'],'config':config,'dataHash':hashlib.sha256(json.dumps(stable_data,sort_keys=True).encode()).hexdigest(),'models':{k:os.getenv(k,'') for k in ('RESEARCH_PROVIDER','RESEARCH_DEEP_MODEL','RESEARCH_QUICK_MODEL')}}
     run_id=hashlib.sha256(json.dumps(identity,sort_keys=True).encode()).hexdigest()
     (ROOT/'work').mkdir(exist_ok=True)
     with sqlite3.connect(ROOT/'work/quarterly.sqlite',timeout=30) as db:
