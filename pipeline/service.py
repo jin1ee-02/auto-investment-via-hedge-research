@@ -69,7 +69,10 @@ class Handler(BaseHTTPRequestHandler):
             if not isinstance(body,dict):raise ValueError('Expected JSON object')
             ids=body.get('fundIds')
             if not isinstance(ids,list) or not 1<=len(ids)<=30 or any(not isinstance(v,str) or not re.fullmatch(r'[a-z0-9_-]+',v) for v in ids):raise ValueError('Invalid fund IDs')
-            if self.path=='/research':
+            if self.path=='/market':
+                from .market import market_batch
+                self.send(200,market_batch(body.get('keys'),ids))
+            elif self.path=='/research':
                 key=body.get('key')
                 if not isinstance(key,str) or len(key)>200:raise ValueError('Invalid security key')
                 result=enqueue(key,ids);self.send(200 if result['status']=='completed' else 202,result)

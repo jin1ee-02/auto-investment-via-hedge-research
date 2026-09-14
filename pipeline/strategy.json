@@ -3,5 +3,9 @@
   "budgetUsd": 10000,
   "maxWeight": 0.2,
   "minCash": 0.1,
-  "maxHoldings": 8
+  "maxHoldings": 8,
+  "startPeriod": "2026-09-30",
+  "maxTurnover": 0.3,
+  "minTradeUsd": 100,
+  "feeBuffer": 0.01
 }

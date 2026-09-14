@@ -1,6 +1,7 @@
 """Construct a quarterly allocation from validated AI research; never produce live orders."""
 import datetime as dt, hashlib, json, os, sqlite3
 from pathlib import Path
+from contextlib import closing
 from .research import ROOT,domain,fingerprint,run_research
 
 def select_candidates(fund_ids,count):
@@ -21,11 +22,11 @@ def build_plan(fund_ids,budget=10000,cap=.2,cash=.1,count=8,run_missing=False):
         reports.append(report)
     if missing: raise ValueError('AI research required first: '+', '.join(missing))
     buy_candidates={r['ticker'] for r in candidates if r['buyers']>=2 and r['buyers']>r['sellers']}
-    scores={r['ticker']:r['decision']['score'] for r in reports if r['ticker'] in buy_candidates and r['decision']['stance']=='buy' and r['decision']['confidence']>=.65 and r['decision']['score']>=60 and not r['decision']['dataGaps']}
+    scores={r['ticker']:r['decision']['score'] for r in reports if r['ticker'] in buy_candidates and r.get('upstreamSignal','').lower() in ('buy','overweight') and r['decision']['stance']=='buy' and r['decision']['confidence']>=.65 and r['decision']['score']>=60 and not r['decision']['dataGaps']}
     allocation=domain({'action':'allocate','fundIds':fund_ids,'scores':scores,'budget':budget,'cap':cap,'cash':cash,'count':count})
     identity={'period':context['period'],'fundIds':sorted(fund_ids),'budget':budget,'cap':cap,'cash':cash,'count':count,'researchHashes':[fingerprint(r['key'],fund_ids) for r in reports]}
     plan_id=hashlib.sha256(json.dumps(identity,sort_keys=True).encode()).hexdigest()
-    plan={'id':plan_id,'status':'completed','mode':'paper_allocation','period':context['period'],'createdAt':dt.datetime.now(dt.timezone.utc).isoformat(),'fundIds':sorted(fund_ids),'budgetUsd':budget,'constraints':{'maxWeight':cap,'minCash':cash,'maxHoldings':count,'minConfidence':.65,'minScore':60},'portfolio':allocation,'research':[{'ticker':r['ticker'],'decision':r['decision']} for r in reports],'excluded':[{'ticker':r['ticker'],'reason':'Non-buy / score / confidence / data gap gate'} for r in reports if r['ticker'] not in scores],'orders':[],'brokerConnected':False,'executionReady':False}
+    plan={'id':plan_id,'status':'completed','mode':'paper_allocation','period':context['period'],'createdAt':dt.datetime.now(dt.timezone.utc).isoformat(),'fundIds':sorted(fund_ids),'budgetUsd':budget,'constraints':{'maxWeight':cap,'minCash':cash,'maxHoldings':count,'minConfidence':.65,'minScore':60},'portfolio':allocation,'research':[{'ticker':r['ticker'],'decision':r['decision'],'upstreamSignal':r.get('upstreamSignal')} for r in reports],'excluded':[{'ticker':r['ticker'],'reason':'Non-buy / score / confidence / data gap gate'} for r in reports if r['ticker'] not in scores],'orders':[],'brokerConnected':False,'executionReady':False}
     output=ROOT/'work/portfolios';output.mkdir(parents=True,exist_ok=True)
     destination=output/(plan_id+'.json')
     if destination.exists(): return json.loads(destination.read_text(encoding='utf-8'))
@@ -34,24 +35,48 @@ def build_plan(fund_ids,budget=10000,cap=.2,cash=.1,count=8,run_missing=False):
 
 def quarterly_once(config,collect_first=True):
     from .collect import collect
+    from .execution import validate_config
+    validate_config(config)
     # A quarterly run is an idempotent dry-run allocation, never a brokerage action.
     if collect_first: collect(os.getenv('SEC_USER_AGENT'))
     dataset=json.loads((ROOT/'data/filings.json').read_text(encoding='utf-8'))
     selected=config['fundIds'];ready={f['id'] for f in dataset['funds'] if f['status']=='ready'}
     if not set(selected).issubset(ready): raise ValueError('Configured fund has incomplete or suspect filings; keep previous plan')
-    stable_data={k:v for k,v in dataset.items() if k!='generatedAt'}
-    identity={'methodology':'quarterly-activity-v1','period':dataset['period'],'config':config,'dataHash':hashlib.sha256(json.dumps(stable_data,sort_keys=True).encode()).hexdigest(),'models':{k:os.getenv(k,'') for k in ('RESEARCH_PROVIDER','RESEARCH_DEEP_MODEL','RESEARCH_QUICK_MODEL')}}
-    run_id=hashlib.sha256(json.dumps(identity,sort_keys=True).encode()).hexdigest()
+    period=dt.date.fromisoformat(dataset['period'])
+    today=dt.date.today()
+    expected=today.replace(month=3*((today.month-1)//3)+1,day=1)-dt.timedelta(days=1)
+    if period!=expected or dataset['period']<config['startPeriod']:
+        raise ValueError('Waiting for the configured new filing quarter')
+    for fund in dataset['funds']:
+        if fund['id'] in selected:
+            for p in (dataset['period'],dataset['previousPeriod']):
+                snapshots=[s for s in fund['snapshots'] if s['period']==p and s['complete']]
+                if len(snapshots)!=1 or not p<=snapshots[0]['filedAt']<=today.isoformat():
+                    raise ValueError('Missing or invalid filing pair')
+    run_id='quarter-v2:'+dataset['period']
     (ROOT/'work').mkdir(exist_ok=True)
-    with sqlite3.connect(ROOT/'work/quarterly.sqlite',timeout=30) as db:
+    with closing(sqlite3.connect(ROOT/'work/quarterly.sqlite',timeout=30)) as db, db:
         db.execute('CREATE TABLE IF NOT EXISTS quarterly (id TEXT PRIMARY KEY,status TEXT NOT NULL,plan TEXT,error TEXT)')
         db.execute('BEGIN IMMEDIATE')
         row=db.execute('SELECT status,plan FROM quarterly WHERE id=?',(run_id,)).fetchone()
         if row and row[0]=='completed': return json.loads(row[1])
+        if row: raise ValueError('Quarter research interrupted; inspect saved state before recovery')
         # The DB transaction holds a cross-process lock through research to prevent duplicates.
-        db.execute('INSERT OR REPLACE INTO quarterly VALUES (?,?,?,?)',(run_id,'running',None,None))
+        db.execute('INSERT INTO quarterly VALUES (?,?,?,?)',(run_id,'running',None,None))
+        db.commit()
         try:
-            plan=build_plan(selected,config['budgetUsd'],config['maxWeight'],config['minCash'],config['maxHoldings'],True)
+            _,candidates=select_candidates(selected,config['maxHoldings'])
+            if candidates:
+                plan=build_plan(selected,config['budgetUsd'],config['maxWeight'],config['minCash'],config['maxHoldings'],True)
+            else:
+                plan={'id':run_id,'period':dataset['period'],'status':'completed','createdAt':dt.datetime.now(dt.timezone.utc).isoformat(),'portfolio':{'positions':[]},'research':[],'orders':[]}
+            current=json.loads((ROOT/'data/filings.json').read_text(encoding='utf-8'))
+            def selected_snapshot(data):
+                return {'period':data['period'],'previousPeriod':data['previousPeriod'],'funds':sorted([f for f in data['funds'] if f['id'] in selected],key=lambda f:f['id'])}
+            if selected_snapshot(current)!=selected_snapshot(dataset) or plan['period']!=dataset['period']:
+                raise ValueError('Filing data changed during research; no mixed-snapshot execution')
+            plan['strategyConfig']=config
+            plan['filingSnapshotHash']=hashlib.sha256(json.dumps(dataset,sort_keys=True).encode()).hexdigest()
             db.execute('UPDATE quarterly SET status=?,plan=? WHERE id=?',('completed',json.dumps(plan),run_id));db.commit();return plan
         except Exception:
-            db.rollback();raise
+            db.execute('UPDATE quarterly SET status=?,error=? WHERE id=?',('failed','Research failed; inspect before explicit recovery',run_id));db.commit();raise

@@ -1,8 +1,8 @@
 """Public progress metadata only; never publishes prompts or internal reasoning."""
 import datetime as dt
 
-STEPS=[('context','공시 확인·준비'),('market','시장·기술 분석'),('news','뉴스 분석'),('fundamentals','재무 분석'),('debate','강세·약세 검토'),('trader','매매안 작성'),('risk','리스크 검토'),('synthesis','펀드 공통 변화 종합'),('validation','결과 검증·저장')]
-NODES={'Market Analyst':('market','market_report'),'News Analyst':('news','news_report'),'Fundamentals Analyst':('fundamentals','fundamentals_report'),'Bull Researcher':('debate',None),'Bear Researcher':('debate',None),'Research Manager':('debate','investment_plan'),'Trader':('trader','trader_investment_plan'),'Aggressive Analyst':('risk',None),'Conservative Analyst':('risk',None),'Neutral Analyst':('risk',None),'Portfolio Manager':('risk','final_trade_decision')}
+STEPS=[('context','공시 확인·준비'),('market','시장·기술 분석'),('social','감성 분석'),('news','뉴스 분석'),('fundamentals','재무 분석'),('debate','강세·약세 검토'),('trader','매매안 작성'),('risk','리스크 검토'),('synthesis','펀드 공통 변화 종합'),('validation','결과 검증·저장')]
+NODES={'Sentiment Analyst':('social','sentiment_report'),'Social Analyst':('social','sentiment_report'),'Market Analyst':('market','market_report'),'News Analyst':('news','news_report'),'Fundamentals Analyst':('fundamentals','fundamentals_report'),'Bull Researcher':('debate',None),'Bear Researcher':('debate',None),'Research Manager':('debate','investment_plan'),'Trader':('trader','trader_investment_plan'),'Aggressive Analyst':('risk',None),'Conservative Analyst':('risk',None),'Neutral Analyst':('risk',None),'Portfolio Manager':('risk','final_trade_decision')}
 
 class Progress:
     def __init__(self,emit=None):

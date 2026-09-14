@@ -47,7 +47,7 @@ class Tests(unittest.TestCase):
             deep_thinking_llm=SimpleNamespace(invoke=lambda _:SimpleNamespace(content=json.dumps(d)))
             def propagate(self,ticker,date):
                 self.asserted=(ticker,date)
-                return {'market_report':'Verified market report','news_report':'News report','fundamentals_report':'Financial report'},'BUY'
+                return {'market_report':'Verified market report','sentiment_report':'Sentiment report','news_report':'News report','fundamentals_report':'Financial report','final_trade_decision':'Buy'},'Buy'
         context={'period':p,'rows':[{'key':'APPLE:EQUITY','ticker':'AAPL','funds':[{'sourceUrl':'https://www.sec.gov/test','previousSourceUrl':'https://www.sec.gov/test'}]}]}
         with tempfile.TemporaryDirectory() as tmp,patch('pipeline.research.ROOT',Path(tmp)),patch('pipeline.research.provider_config',return_value={'llm_provider':'test','deep_think_llm':'test','quick_think_llm':'test'}),patch('pipeline.research.domain',return_value=context),patch('pipeline.research.fingerprint',return_value='a'*64):
             result=run_research('APPLE:EQUITY',['fund'],lambda _:Graph());self.assertEqual(result['decision']['score'],75);self.assertFalse(result['brokerConnected']);self.assertTrue((Path(tmp)/'work/research'/('a'*64+'.json')).exists())
