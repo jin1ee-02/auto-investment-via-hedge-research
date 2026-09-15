@@ -45,14 +45,25 @@ export function activityConsensus(row:Aggregate){
  const participants=row.buyers+row.sellers;
  return {direction:row.buyers===row.sellers?'mixed':row.buyers>row.sellers?'buy':'sell',common:Math.max(row.buyers,row.sellers),agreement:participants?Math.max(row.buyers,row.sellers)/participants:0};
 }
+export type CandidateFilter={direction:'all'|'increase'|'decrease';minFunds:number;includeMixed:boolean};
+export const defaultCandidateFilter:CandidateFilter={direction:'all',minFunds:2,includeMixed:true};
+export function validateCandidateFilter(value:CandidateFilter):CandidateFilter{
+ if(!value||!['all','increase','decrease'].includes(value.direction)||!Number.isInteger(value.minFunds)||value.minFunds<2||value.minFunds>30||typeof value.includeMixed!=='boolean')throw Error('잘못된 공통 변화 후보 조건');
+ return value;
+}
+export function movementCounts(row:Aggregate){
+ return {new:row.funds.filter(f=>f.movement==='new').length,increased:row.funds.filter(f=>f.movement==='increased').length,decreased:row.funds.filter(f=>f.movement==='decreased').length,closed:row.funds.filter(f=>f.movement==='closed').length};
+}
 export function buyResearchCandidates(rows:Aggregate[],count=20){
  return researchCandidates(rows,count).filter(r=>r.buyers>=2&&r.buyers>r.sellers&&r.holders>0).map(r=>({...r,score:r.buyers}));
 }
 // Shared activity screen. Fully exited stocks remain eligible for risk research.
-export function researchCandidates(rows:Aggregate[],count?:number):Aggregate[]{
+export function researchCandidates(rows:Aggregate[],count?:number,filter:CandidateFilter=defaultCandidateFilter):Aggregate[]{
+ validateCandidateFilter(filter);
  if(count!==undefined&&(!Number.isInteger(count)||count<1||count>20))throw Error('Research count must be 1..20');
  const unique=new Map<string,Aggregate>();
- for(const row of [...rows].filter(r=>r.kind==='EQUITY'&&r.ticker&&Math.max(r.buyers,r.sellers)>=2).sort((a,b)=>activityConsensus(b).common-activityConsensus(a).common||activityConsensus(b).agreement-activityConsensus(a).agreement||a.key.localeCompare(b.key))){
+ const participants=(r:Aggregate)=>filter.direction==='increase'?r.buyers:filter.direction==='decrease'?r.sellers:Math.max(r.buyers,r.sellers);
+ for(const row of [...rows].filter(r=>r.kind==='EQUITY'&&r.ticker&&participants(r)>=filter.minFunds&&(filter.includeMixed||!(r.buyers>=filter.minFunds&&r.sellers>=filter.minFunds))).sort((a,b)=>participants(b)-participants(a)||activityConsensus(b).agreement-activityConsensus(a).agreement||a.key.localeCompare(b.key))){
   if(!unique.has(row.ticker!))unique.set(row.ticker!,row);
  }
  return count===undefined?[...unique.values()]:[...unique.values()].slice(0,count);

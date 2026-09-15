@@ -1,11 +1,26 @@
 {
-  "fundIds": ["berkshire", "pershing", "bridgewater", "appaloosa", "thirdpoint", "viking", "lonepine", "coatue"],
+  "fundIds": [
+    "berkshire",
+    "pershing",
+    "bridgewater",
+    "appaloosa",
+    "thirdpoint",
+    "viking",
+    "lonepine",
+    "coatue"
+  ],
   "budgetUsd": 10000,
   "maxWeight": 0.2,
   "minCash": 0.1,
-  "maxHoldings": 8,
+  "maxHoldings": 6,
+  "researchCandidateCount": 6,
   "startPeriod": "2026-09-30",
   "maxTurnover": 0.3,
   "minTradeUsd": 100,
-  "feeBuffer": 0.01
+  "feeBuffer": 0.01,
+  "candidateFilter": {
+    "direction": "all",
+    "minFunds": 2,
+    "includeMixed": true
+  }
 }

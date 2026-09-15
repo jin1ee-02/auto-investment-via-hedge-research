@@ -1,6 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {researchCandidates,buyResearchCandidates,activityConsensus} from '../lib/domain.ts';
+import {researchCandidates,buyResearchCandidates,activityConsensus,movementCounts,defaultCandidateFilter} from '../lib/domain.ts';
+
+test('Directional thresholds use quarterly changes, never ownership size',()=>{
+ const base={kind:'EQUITY',holders:20,funds:[],score:100};
+ const rows=[{...base,key:'hold',ticker:'HOLD',buyers:0,sellers:0},{...base,key:'up',ticker:'UP',buyers:3,sellers:0},{...base,key:'exit',ticker:'EXIT',holders:0,buyers:0,sellers:3},{...base,key:'mix',ticker:'MIX',buyers:3,sellers:3},{...base,key:'weak',ticker:'WEAK',buyers:2,sellers:0}];
+ assert.deepEqual(researchCandidates(rows,undefined,{...defaultCandidateFilter,direction:'increase',minFunds:3,includeMixed:false}).map(r=>r.ticker),['UP']);
+ assert.deepEqual(researchCandidates(rows,undefined,{...defaultCandidateFilter,direction:'decrease',minFunds:3,includeMixed:false}).map(r=>r.ticker),['EXIT']);
+ assert.equal(researchCandidates(rows,undefined,{...defaultCandidateFilter,minFunds:3}).length,3);
+ assert.throws(()=>researchCandidates(rows,undefined,{...defaultCandidateFilter,minFunds:1}));
+ assert.deepEqual(movementCounts({funds:['new','increased','decreased','closed','unchanged','new'].map(movement=>({movement}))}),{new:2,increased:1,decreased:1,closed:1});
+});
 import {filingCalendar} from '../lib/filing-calendar.ts';
 test('Browse all candidates beyond 20 while automatic research stays bounded',()=>{
  const rows=Array.from({length:35},(_,i)=>({kind:'EQUITY',key:String(i).padStart(2,'0'),ticker:'T'+i,buyers:2,sellers:0,holders:2}));

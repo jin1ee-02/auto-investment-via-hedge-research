@@ -1,4 +1,4 @@
-"""Toss REST adapter. Official OpenAPI 1.2.15, inspected 2026-09-12.
+"""Toss REST adapter. Official OpenAPI 1.2.17, inspected 2026-09-14.
 
 No automatic HTTP retries, redirects, or logging of credentials/responses.
 """
@@ -24,12 +24,18 @@ class TossBroker:
         self.client_id = os.environ.get('TOSS_CLIENT_ID', '')
         self.secret = os.environ.get('TOSS_CLIENT_SECRET', '')
         self.account = '' if discover_account else os.environ.get('TOSS_ACCOUNT_SEQ', '')
-        if not self.client_id or not self.secret or (not discover_account and not self.account.isdigit()):
-            raise BrokerError('Configure TOSS_CLIENT_ID, TOSS_CLIENT_SECRET, TOSS_ACCOUNT_SEQ')
+        if not self.client_id or not self.secret or (self.account and not self.account.isdigit()):
+            raise BrokerError('Configure TOSS_CLIENT_ID and TOSS_CLIENT_SECRET; TOSS_ACCOUNT_SEQ must be numeric when set')
         self.token = None
         self.expires = 0
         self.last_request = 0
         self.opener = urllib.request.build_opener(NoRedirect())
+        if not discover_account and not self.account:
+            accounts = self.get('accounts')
+            eligible = [a for a in accounts if isinstance(a, dict) and a.get('accountType') == 'BROKERAGE'] if isinstance(accounts, list) else []
+            if len(eligible) != 1 or isinstance(eligible[0].get('accountSeq'), bool) or not isinstance(eligible[0].get('accountSeq'), int):
+                raise BrokerError('Set TOSS_ACCOUNT_SEQ when there is not exactly one brokerage account')
+            self.account = str(eligible[0]['accountSeq'])
 
     def _http(self, method, path, payload=None, auth=True):
         if auth and time.monotonic() >= self.expires:
@@ -72,6 +78,8 @@ class TossBroker:
                 pass
             stage = 'API' if auth else 'authentication'
             detail = f' ({code})' if code else ''
+            if not auth and exc.code == 403:
+                raise BrokerError('토스 인증이 현재 접속 IP를 허용하지 않았습니다 (HTTP 403). 토스증권 WTS > Open API > 허용 IP 관리에서 이 컴퓨터의 현재 공인 IP를 등록한 뒤 다시 실행하세요') from None
             raise BrokerError(f'Broker {stage} HTTP {exc.code}{detail}; no automatic retry') from None
         except (OSError, ValueError, KeyError):
             raise BrokerError('Broker response unavailable; no automatic retry') from None
@@ -83,7 +91,10 @@ class TossBroker:
     def submit(self, order):
         if os.environ.get('TOSS_ENABLE_LIVE') != 'true':
             raise BrokerError('TOSS_ENABLE_LIVE must be true for execution')
-        result = self._http('POST', '/api/v1/orders', order)
+        required=('clientOrderId','symbol','side','orderType','timeInForce','quantity','price')
+        if any(key not in order for key in required):
+            raise BrokerError('Invalid order payload')
+        result = self._http('POST', '/api/v1/orders', {key:order[key] for key in required})
         if not isinstance(result, dict) or not result.get('orderId'):
             raise BrokerError('Order acknowledgement missing; reconcile without resubmitting')
         return result

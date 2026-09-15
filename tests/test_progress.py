@@ -1,7 +1,21 @@
 import unittest
+import tempfile
+from pathlib import Path
 from pipeline.progress import Progress,attach_progress,STEPS
 
 class ProgressTests(unittest.TestCase):
+    def test_enqueue_persists_candidate_identity(self):
+        from unittest.mock import patch
+        from pipeline import service
+        submitted=[]
+        context={'rows':[{'key':'A:EQUITY','ticker':'AAPL'}]}
+        with tempfile.TemporaryDirectory() as tmp,patch.object(service,'ROOT',Path(tmp)),patch.object(service,'provider_config'),patch.object(service,'domain',return_value=context),patch.object(service,'fingerprint',return_value='a'*64),patch.object(service.POOL,'submit',side_effect=lambda *args:submitted.append(args)):
+            result=service.enqueue('A:EQUITY',['fund'])
+            saved=service.get_job('a'*64)
+        self.assertEqual(result['ticker'],'AAPL')
+        self.assertEqual(saved['key'],'A:EQUITY')
+        self.assertEqual(saved['fundIds'],['fund'])
+        self.assertEqual(submitted[0][4]['ticker'],'AAPL')
     def test_service_retains_last_progress_on_failure(self):
         from unittest.mock import patch
         from pipeline.service import worker

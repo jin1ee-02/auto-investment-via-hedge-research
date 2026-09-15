@@ -1,4 +1,4 @@
-> 2026-09-12 업데이트: 아래는 이전 스윙 작업대/제안 기록입니다. 현재 분기 자동매매 동작은 [QUARTERLY_TRADING.md](QUARTERLY_TRADING.md)를 우선 참고하세요.
+> 역사 자료: 아래는 구현 전 제안입니다. 현재 상시 실행형 동작은 [QUARTERLY_TRADING.md](QUARTERLY_TRADING.md)를 우선 참고하세요.
 
 # 보유 계좌 기반 매매안 설계 (구현 제안)
 
