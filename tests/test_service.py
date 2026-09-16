@@ -22,7 +22,7 @@ class PipelineServiceTests(unittest.TestCase):
         self.assertEqual(len(submitted),1)
 
     def test_enqueue_pipeline_rejects_out_of_range_candidate_count(self):
-        with patch('pipeline.service.provider_config'):
+        with tempfile.TemporaryDirectory() as tmp,patch('pipeline.service.ROOT',Path(tmp)),patch('pipeline.service.provider_config'):
             with self.assertRaisesRegex(ValueError,'candidateCount'):
                 service.enqueue_pipeline(['fund-a','fund-b'],candidate_count=9)
 

@@ -81,7 +81,7 @@ def _run_research_with_retry(key,ids,on_progress=None):
 
 def _pipeline_error(exc,stage):
     if type(exc).__name__ in TRANSIENT_RESEARCH_ERRORS:
-        return 'AI 서비스 연결이 세 차례 실패했습니다. 완료된 보고서는 보존되었습니다. 네트워크 연결을 확인한 뒤 다시 실행하세요.'
+        return 'AI 서비스 연결이 세 차례 실패했습니다. 완료된 보고서는 보존되었습니다. 리서치 서버의 외부 네트워크 접근 권한·방화벽·프록시를 확인하세요. 제한된 실행 환경에서 시작했다면 네트워크 접근이 허용된 터미널에서 서버를 재시작한 뒤 다시 실행하세요.'
     if stage=='account':
         return f'리서치는 완료했지만 계좌 기반 매매안을 만들지 못했습니다: {str(exc)[:400]}'
     return f'종목 리서치를 완료하지 못했습니다: {str(exc)[:400]}'

@@ -48,6 +48,29 @@ def approved_execution(p,b,config):
 
 
 class ExecutionTests(unittest.TestCase):
+    def test_relaxed_sizing_uses_cash_without_reserve_and_keeps_fee_buffer(self):
+        config={**CONFIG,'maxWeight':1,'minCash':0,'maxTurnover':1,'minTradeUsd':0}
+        p=plan();p['portfolio']['positions'][0]['amount']=1000
+        b=Broker()
+        orders=execution.draft_orders(p,b,config)
+        self.assertEqual(orders[0]['quantity'],'9')
+        self.assertEqual(b.sent,[])
+        targets=portfolio._allocate_account_targets([{'ticker':'AAPL','allocationScore':100}],1000,0,set(),config)
+        self.assertEqual(targets[0]['amount'],1000)
+
+    def test_zero_minimum_allows_small_order_but_negative_is_rejected(self):
+        config={**CONFIG,'maxWeight':1,'minCash':0,'maxTurnover':1,'minTradeUsd':0}
+        b=Broker();original=b.get
+        def get(path,**query):
+            rows=original(path,**query)
+            if path=='prices':
+                for row in rows:row['lastPrice']='50'
+            return rows
+        b.get=get
+        p=plan();p['portfolio']['positions'][0]['amount']=50
+        self.assertEqual(execution.draft_orders(p,b,config)[0]['quantity'],'1')
+        with self.assertRaises(ValueError):execution.validate_config({**config,'minTradeUsd':-1})
+
     def setUp(self):
         self.tmp=tempfile.TemporaryDirectory();self.addCleanup(self.tmp.cleanup)
         self.root=Path(self.tmp.name)

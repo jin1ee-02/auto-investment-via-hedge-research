@@ -25,9 +25,10 @@ def validate_config(config):
     if policy is not None:
         if not isinstance(policy,dict) or policy.get('direction') not in ('all','increase','decrease') or type(policy.get('minFunds')) is not int or not 2<=policy['minFunds']<=30 or type(policy.get('includeMixed')) is not bool:
             raise ValueError('Invalid candidateFilter')
-    for name in ('maxWeight', 'maxTurnover', 'minTradeUsd', 'feeBuffer'):
+    for name in ('maxWeight', 'maxTurnover', 'feeBuffer'):
         if number(config[name]) <= 0:
             raise ValueError('Invalid ' + name)
+    number(config['minTradeUsd']) # Zero disables the optional minimum order size.
     if 'budgetUsd' in config and number(config['budgetUsd']) <= 0:
         raise ValueError('Invalid budgetUsd')
     for name in ('maxWeight', 'maxTurnover'):

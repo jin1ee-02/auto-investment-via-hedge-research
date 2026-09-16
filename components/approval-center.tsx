@@ -1,16 +1,28 @@
 "use client";
-import {ShieldCheck,FileCheck2,LockKeyhole,ArrowRight,Download} from 'lucide-react';
+
+import {useEffect,useState} from 'react';
+import {Check,Clipboard,Download,LockKeyhole} from 'lucide-react';
 
 export type Review={schemaVersion:1;id:string;status:string;account:string;expiresAt:string;createdAt:string;orders:{symbol:string;side:string;quantity:string;price:string;rationale?:string}[];plan:{period:string;research:{ticker:string;action?:string;actionReason?:string;allocationScore?:number;decision:{stance:string;thesis?:string;risks?:string[];dataGaps?:string[]}}[]}};
+
 function save(name:string,content:string,type:string){const url=URL.createObjectURL(new Blob([content],{type}));const anchor=document.createElement('a');anchor.href=url;anchor.download=name;anchor.click();URL.revokeObjectURL(url)}
 const escapeHtml=(value:unknown)=>String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]||char));
 function exportHtml(review:Review){const orders=review.orders.map(order=>`<tr><td>${escapeHtml(order.symbol)}</td><td>${escapeHtml(order.side)}</td><td>${escapeHtml(order.quantity)}</td><td>${escapeHtml(order.price)}</td><td>${escapeHtml(order.rationale)}</td></tr>`).join('');const research=review.plan.research.map(item=>`<h2>${escapeHtml(item.ticker)} · ${escapeHtml(item.action)}</h2><p>${escapeHtml(item.actionReason)}</p><p>${escapeHtml(item.decision.thesis)}</p>`).join('');return `<!doctype html><html lang="ko"><meta charset="utf-8"><title>Hedge Insight ${escapeHtml(review.id)}</title><style>body{max-width:960px;margin:40px auto;font:16px/1.6 system-ui}table{width:100%;border-collapse:collapse}td,th{padding:8px;border:1px solid #ccc;text-align:left}</style><h1>${escapeHtml(review.plan.period)} 주문 검토</h1><p>계좌 ${escapeHtml(review.account)} · 만료 ${escapeHtml(review.expiresAt)}</p><table><thead><tr><th>종목</th><th>방향</th><th>수량</th><th>가격</th><th>근거</th></tr></thead><tbody>${orders}</tbody></table>${research}</html>`}
+
 export function ApprovalCenter({review}:{review?:Review|null}={}){
- return <div className="approval-center"><div className="research-intro"><div><p className="eyebrow">03 / YOUR DECISION, YOUR CONTROL</p><h2>마지막 결정은, 당신에게.</h2><p>리서치가 끝나도 주문은 멈춰 있습니다. 내용을 확인하고 직접 승인하세요.</p></div><ShieldCheck size={32}/></div>
- <div className="approval-flow"><div><FileCheck2/><b>01. 검토 보고서</b><span>판단 근거 · 위험 · 주문 수량</span></div><ArrowRight/><div><LockKeyhole/><b>02. 본인 승인</b><span>로컬 터미널에서 직접 확인</span></div><ArrowRight/><div><ShieldCheck/><b>03. 검증 후 전송</b><span>변경 · 만료 시 새 승인 필요</span></div></div>
- <section className="panel review-import"><span className="subtle-badge">PIPELINE REVIEW ONLY</span><h2>{review?'현재 파이프라인 주문안':'완료된 주문안이 없습니다'}</h2><p className="muted">{review?'방금 완료된 파이프라인의 원본 승인 기록입니다. 아래에서 JSON 또는 HTML 사본을 저장할 수 있습니다.':'리서치·매매안 화면에서 펀드를 선택하고 파이프라인을 실행하세요. 주문은 자동 전송되지 않습니다.'}</p>{review&&<div className="controls"><button className="secondary-button" onClick={()=>save(`approval-${review.id}.json`,JSON.stringify(review,null,2),'application/json')}><Download size={15}/>JSON 저장</button><button className="secondary-button" onClick={()=>save(`approval-${review.id}.html`,exportHtml(review),'text/html')}><Download size={15}/>HTML 저장</button></div>}</section>
- {review&&<section className="panel review-report"><div className="section-heading"><div><p className="eyebrow">ORDER REVIEW</p><h2>{review.plan.period} · 주문안</h2></div><span className="subtle-badge">승인 스냅샷 · 실시간 상태 아님</span></div><p>계좌 {review.account} · {review.orders.length}건 · 지정가 / DAY / USD</p><p className="muted">승인 기한 {new Date(review.expiresAt).toLocaleString('ko-KR')} · 실행기가 만료와 현재 상태를 다시 검증합니다.</p><div className="review-table"><table><thead><tr><th>종목</th><th>방향</th><th>수량</th><th>지정가 USD</th><th>금액 USD</th></tr></thead><tbody>{review.orders.map((o,i)=><tr key={i}><td>{o.symbol}</td><td className={o.side==='BUY'?'positive':'negative'}>{o.side==='BUY'?'매수':'매도'}</td><td>{o.quantity}</td><td>{o.price}</td><td>{(Number(o.quantity)*Number(o.price)).toFixed(2)}</td></tr>)}</tbody></table></div>
- <h3>리서치 판단</h3>{review.plan.research.map((r,i)=><details className="report-section" key={i}><summary>{r.ticker} · {{buy:'매수 검토',watch:'관찰',avoid:'회피'}[r.decision.stance]||r.decision.stance}</summary><div className="markdown-report"><p>{r.actionReason}</p><p>{r.decision.thesis}</p><ul>{r.decision.risks?.map((v,n)=><li key={n}>{v}</li>)}</ul>{r.decision.dataGaps?.map((v,n)=><p className="negative" key={n}>미확인: {v}</p>)}</div></details>)}
- <h3>확인 후 본인 터미널에서 승인</h3><p className="muted">실행기는 SQLite 원본을 읽고 주문안을 다시 표시합니다. 승인 기한은 15분이며 현재 주문안이 달라지면 새 보고서가 필요합니다.</p><pre>{`.venv/Scripts/python -X utf8 -m pipeline.run --broker toss --approve ${review.id}`}</pre><p className="muted">보류하려면 승인하지 마세요. 거절은 다음 명령으로 기록합니다.</p><pre>{`.venv/Scripts/python -X utf8 -m pipeline.run --reject ${review.id}`}</pre></section>}
- <p className="approval-footnote"><LockKeyhole size={14}/>이 웹사이트에는 실제 주문 승인·전송 API가 없습니다. 승인 없이 반복 실행해도 주문은 나가지 않습니다.</p></div>;
+ const [now,setNow]=useState<number|null>(null);
+ const [copied,setCopied]=useState(false);
+ useEffect(()=>{const initial=window.setTimeout(()=>setNow(Date.now()),0);const timer=window.setInterval(()=>setNow(Date.now()),30000);return()=>{window.clearTimeout(initial);window.clearInterval(timer)}},[]);
+ if(!review)return null;
+ const command=`.venv/Scripts/python.exe -X utf8 -m pipeline.run --broker toss --approve ${review.id}`;
+ const remaining=now===null?null:Math.max(0,Math.ceil((new Date(review.expiresAt).getTime()-now)/60000));
+ const expired=remaining===0;
+ async function copy(){try{await navigator.clipboard.writeText(command);setCopied(true);window.setTimeout(()=>setCopied(false),2500)}catch{setCopied(false)}}
+ return <section className="panel inline-approval">
+  <div className="approval-heading"><div><p className="eyebrow">FINAL STEP</p><h2>{expired?'주문안이 만료되었습니다.':'검토 후 직접 승인하세요.'}</h2><p>{expired?'최신 가격과 계좌 상태로 새 매매안을 만들어야 합니다.':'웹에서는 주문을 보내지 않습니다. 아래 명령을 복사해 본인 터미널에서 실행하면 주문 내용을 다시 확인합니다.'}</p></div><LockKeyhole/></div>
+  <div className="approval-status"><span>계좌 <b>{review.account}</b></span><span>지정가 DAY <b>{review.orders.length}건</b></span><span className={expired?'negative':''}>{expired?'유효시간 종료':remaining===null?'유효시간 확인 중':`약 ${remaining}분 남음`}</span></div>
+  <div className="approval-actions"><button className="primary-button" disabled={expired} onClick={copy}>{copied?<Check/>:<Clipboard/>}{copied?'복사했습니다':'터미널 승인 명령 복사'}</button><button className="secondary-button" onClick={()=>save(`approval-${review.id}.html`,exportHtml(review),'text/html')}><Download/>보고서 저장</button><button className="text-button" onClick={()=>save(`approval-${review.id}.json`,JSON.stringify(review,null,2),'application/json')}>JSON 저장</button></div>
+  {!expired&&<details><summary>승인 명령 직접 보기</summary><pre>{command}</pre></details>}
+  <p className="approval-footnote"><LockKeyhole/>터미널에서 정확한 승인 문구를 입력하기 전에는 주문이 전송되지 않습니다. 계좌나 가격이 달라지면 실행기가 승인을 거부합니다.</p>
+ </section>;
 }
